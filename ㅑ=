@@ -1,0 +1,977 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>제주 가치줍깅</title>
+<!-- Leaflet 지도 라이브러리 (CDN) -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    font-family: "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+    background: #f0f7f4;
+    display: flex; flex-direction: column;
+  }
+
+  /* ===== 상단 바 ===== */
+  header {
+    background: linear-gradient(135deg, #1a7f5a, #2eb086);
+    color: #fff;
+    padding: 10px 14px;
+    box-shadow: 0 2px 6px rgba(0,0,0,.2);
+    z-index: 1100;
+  }
+  .header-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .logo { font-size: 18px; font-weight: bold; white-space: nowrap; }
+  .logo small { font-weight: normal; font-size: 11px; opacity: .85; display: block; }
+  .header-icons { display: flex; gap: 8px; }
+  .icon-btn {
+    background: rgba(255,255,255,.18);
+    border: 1px solid rgba(255,255,255,.35);
+    color: #fff; border-radius: 10px;
+    padding: 6px 10px; font-size: 13px; cursor: pointer;
+    transition: background .15s;
+    white-space: nowrap;
+  }
+  .icon-btn:hover { background: rgba(255,255,255,.32); }
+
+  .status-row {
+    display: flex; flex-wrap: wrap; gap: 6px 14px;
+    margin-top: 8px; font-size: 12.5px;
+  }
+  .status-item { background: rgba(0,0,0,.15); border-radius: 8px; padding: 4px 8px; }
+  .status-item b { color: #ffe27a; }
+
+  .timer-row { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+  #timerDisplay { font-size: 22px; font-weight: bold; font-variant-numeric: tabular-nums; }
+  .timer-btn {
+    border: none; border-radius: 20px; padding: 8px 18px;
+    font-size: 14px; font-weight: bold; cursor: pointer;
+  }
+  .btn-start { background: #ffd043; color: #4a3b00; }
+  .btn-stop { background: #ff6b6b; color: #fff; }
+
+  /* ===== 중앙 지도 ===== */
+  #map { flex: 1; min-height: 300px; z-index: 1; }
+
+  /* ===== 하단 바 ===== */
+  footer {
+    background: #fff;
+    border-top: 2px solid #d8ebe2;
+    padding: 10px 14px;
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    z-index: 1100;
+  }
+  .point-box { font-size: 15px; }
+  .point-box b { color: #1a7f5a; font-size: 20px; }
+  .footer-icons { display: flex; gap: 8px; }
+  .footer-btn {
+    border: none; border-radius: 12px; padding: 9px 12px;
+    font-size: 13px; font-weight: bold; cursor: pointer;
+    display: flex; align-items: center; gap: 5px;
+  }
+  .btn-shop { background: #2eb086; color: #fff; }
+  .btn-rank { background: #4a7de0; color: #fff; }
+  .btn-donate { background: #ff8c42; color: #fff; }
+
+  /* ===== 모달 공통 ===== */
+  .modal-back {
+    position: fixed; inset: 0; background: rgba(0,0,0,.5);
+    display: none; align-items: center; justify-content: center;
+    z-index: 2000; padding: 16px;
+  }
+  .modal-back.open { display: flex; }
+  .modal {
+    background: #fff; border-radius: 14px;
+    width: 100%; max-width: 460px; max-height: 85vh;
+    overflow-y: auto; padding: 18px;
+    box-shadow: 0 10px 30px rgba(0,0,0,.3);
+  }
+  .modal h2 { font-size: 17px; color: #1a7f5a; margin-bottom: 12px; }
+  .modal-close {
+    float: right; border: none; background: #eee; border-radius: 50%;
+    width: 28px; height: 28px; cursor: pointer; font-size: 14px;
+  }
+
+  /* 상점 */
+  .cat-tabs { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
+  .cat-tab {
+    border: 1px solid #2eb086; background: #fff; color: #2eb086;
+    border-radius: 16px; padding: 5px 12px; font-size: 13px; cursor: pointer;
+  }
+  .cat-tab.active { background: #2eb086; color: #fff; }
+  .shop-item {
+    display: flex; align-items: center; justify-content: space-between;
+    border: 1px solid #e2eee8; border-radius: 10px;
+    padding: 10px; margin-bottom: 8px; gap: 8px;
+  }
+  .shop-item .name { font-size: 14px; font-weight: bold; }
+  .shop-item .price { font-size: 14px; color: #1a7f5a; font-weight: bold; }
+  .shop-item .real-price { font-size: 11px; color: #999; margin-left: 4px; font-weight: normal; }
+  .shop-item .limit { font-size: 11px; color: #b07020; }
+  .buy-btn {
+    border: none; background: #2eb086; color: #fff;
+    border-radius: 8px; padding: 6px 12px; cursor: pointer; font-size: 13px;
+    white-space: nowrap;
+  }
+  .buy-btn:disabled { background: #bbb; cursor: not-allowed; }
+
+  /* 랭킹 */
+  .rank-tabs { display: flex; gap: 6px; margin-bottom: 12px; }
+  .rank-row {
+    display: flex; justify-content: space-between; padding: 8px 10px;
+    border-bottom: 1px solid #eee; font-size: 14px;
+  }
+  .rank-row.me { background: #fff6da; border-radius: 8px; font-weight: bold; }
+  .rank-medal { width: 26px; display: inline-block; }
+  .bonus-note {
+    background: #eef6ff; border-radius: 8px; padding: 8px 10px;
+    font-size: 12px; color: #33569c; margin-bottom: 10px; line-height: 1.5;
+  }
+
+  /* 파티 */
+  .party-card {
+    border: 1px solid #e2eee8; border-radius: 10px;
+    padding: 10px; margin-bottom: 8px;
+    display: flex; justify-content: space-between; align-items: center; gap: 8px;
+  }
+  .party-card .p-name { font-weight: bold; font-size: 14px; }
+  .party-card .p-info { font-size: 12px; color: #777; }
+  .party-section-title { font-size: 13px; color: #555; margin: 12px 0 6px; font-weight: bold; }
+  .party-create { display: flex; gap: 6px; margin-top: 10px; }
+  .party-create input {
+    flex: 1; border: 1px solid #ccc; border-radius: 8px; padding: 8px; font-size: 13px;
+  }
+
+  /* 인증/후원 */
+  .verify-box {
+    background: #fff8ec; border: 1px dashed #e0a94f; border-radius: 10px;
+    padding: 12px; font-size: 13px; line-height: 1.6; margin-bottom: 10px;
+  }
+  .primary-btn {
+    width: 100%; border: none; background: #1a7f5a; color: #fff;
+    border-radius: 10px; padding: 11px; font-size: 15px; font-weight: bold;
+    cursor: pointer; margin-top: 8px;
+  }
+  .primary-btn:disabled { background: #aaa; cursor: not-allowed; }
+  .donate-account {
+    background: #f4f8f6; border-radius: 10px; padding: 12px;
+    font-size: 15px; text-align: center; margin: 10px 0; font-weight: bold;
+  }
+  .small-input {
+    width: 100%; border: 1px solid #ccc; border-radius: 8px; padding: 8px;
+    font-size: 13px; margin-top: 6px;
+  }
+  #photoPreview { max-width: 100%; border-radius: 10px; margin-top: 8px; display: none; }
+
+  /* 안내 토스트 */
+  #toast {
+    position: fixed; left: 50%; bottom: 90px; transform: translateX(-50%);
+    background: rgba(30,30,30,.9); color: #fff; padding: 10px 18px;
+    border-radius: 20px; font-size: 13px; display: none; z-index: 3000;
+    max-width: 90%; text-align: center;
+  }
+  .guest-badge {
+    background: #ffe27a; color: #5c4a00; border-radius: 8px;
+    padding: 2px 7px; font-size: 11px; font-weight: bold;
+  }
+  #fatalError {
+    display: none; position: fixed; inset: 0; z-index: 9999;
+    background: #fff; color: #b3261e; padding: 20px;
+    font-family: monospace; font-size: 13px; line-height: 1.6;
+    overflow: auto; white-space: pre-wrap;
+  }
+  #fatalError.show { display: block; }
+</style>
+</head>
+<body>
+
+<div id="fatalError"></div>
+
+<!-- ===================== 상단 ===================== -->
+<header>
+  <div class="header-top">
+    <div class="logo"> 제주 가치줍깅 <span class="guest-badge">게스트</span>
+      <small>제주를 줍깅하고 포인트 받자!</small>
+    </div>
+    <div class="header-icons">
+      <button class="icon-btn" onclick="openModal('partyModal'); renderParties();">파티</button>
+    </div>
+  </div>
+  <div class="status-row">
+    <div class="status-item"> 지역: <b id="zoneName">지도를 눌러 선택</b></div>
+    <div class="status-item">시작: <b id="startTimeText">-</b></div>
+    <div class="status-item">종료: <b id="endTimeText">-</b></div>
+    <div class="status-item">오늘 총 줍깅: <b id="dailyTotalText">00:00:00</b> <span style="opacity:.8">(자정 초기화)</span></div>
+  </div>
+  <div class="timer-row">
+    <div id="timerDisplay">00:00:00</div>
+    <button id="timerBtn" class="timer-btn btn-start" onclick="toggleTimer()">▶ 줍깅 시작</button>
+  </div>
+</header>
+
+<!-- ===================== 중앙: 제주 지도 ===================== -->
+<div id="map"></div>
+
+<!-- ===================== 하단 ===================== -->
+<footer>
+  <div class="point-box"> 내 포인트: <b id="pointText">0</b> P</div>
+  <div class="footer-icons">
+    <button class="footer-btn btn-shop" onclick="openShop()"> 상점</button>
+    <button class="footer-btn btn-rank" onclick="openRanking()"> 랭킹</button>
+    <button class="footer-btn btn-donate" onclick="openDonate()"> 후원</button>
+  </div>
+</footer>
+
+<!-- ===================== 포인트 상점 모달 ===================== -->
+<div class="modal-back" id="shopModal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('shopModal')">✕</button>
+    <h2>🛒 포인트 상점</h2>
+    <div class="cat-tabs" id="catTabs"></div>
+    <div id="shopList"></div>
+  </div>
+</div>
+
+<!-- ===================== 랭킹 모달 ===================== -->
+<div class="modal-back" id="rankModal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('rankModal')">✕</button>
+    <h2> 줍깅 랭킹</h2>
+    <div class="bonus-note">
+       <b>보너스 포인트</b><br>
+      주간 랭킹 1~3위: +300P / +200P / +100P<br>
+      월간 랭킹 1~3위: +1000P / +700P / +400P<br>
+      (순위권에 들면 랭킹 창을 열 때 자동 지급됩니다)
+    </div>
+    <div class="rank-tabs" id="rankTabs"></div>
+    <div id="rankList"></div>
+  </div>
+</div>
+
+<!-- ===================== 파티 모달 ===================== -->
+<div class="modal-back" id="partyModal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('partyModal')">✕</button>
+    <h2>줍깅 파티</h2>
+    <div class="party-section-title"> 내가 참가 중인 파티</div>
+    <div id="myPartyList"></div>
+    <div class="party-section-title"> 참가할 수 있는 파티</div>
+    <div id="openPartyList"></div>
+    <div class="party-section-title"> 새 파티 만들기 (부적절한 파티명 금지)</div>
+    <div class="party-create">
+      <input type="text" id="newPartyName" placeholder="파티 이름 입력" maxlength="20">
+      <button class="buy-btn" onclick="createParty()">생성</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== 인증 사진 모달 ===================== -->
+<div class="modal-back" id="verifyModal">
+  <div class="modal">
+    <h2> 줍깅 인증</h2>
+    <div class="verify-box">
+      줍깅 시간 조작 방지를 위해 <b>활동 종료 후 1시간 이내</b>에 줍깅 인증 사진을 등록해야
+      포인트가 지급됩니다.<br>
+      이번 활동 시간: <b id="verifyDuration">-</b><br>
+      남은 인증 시간: <b id="verifyRemain">-</b>
+    </div>
+    <input type="file" id="photoInput" accept="image/*" onchange="previewPhoto()">
+    <img id="photoPreview" alt="인증 사진 미리보기">
+    <button class="primary-btn" id="verifyBtn" onclick="submitVerification()" disabled>인증하고 포인트 받기</button>
+    <button class="primary-btn" style="background:#999" onclick="cancelVerification()">나중에 하기 (헤더에서 다시 열 수 있음)</button>
+  </div>
+</div>
+
+<!-- ===================== 후원 모달 ===================== -->
+<div class="modal-back" id="donateModal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('donateModal')">✕</button>
+    <h2> 서비스 후원하기</h2>
+    <p style="font-size:13px; line-height:1.6; color:#555;">
+      제주 가치줍깅은 정부·지방자치단체의 지원을 받지 않는 서비스입니다.<br>
+      여러분의 후원이 깨끗한 제주 바다를 만듭니다. 
+    </p>
+    <div class="donate-account" id="donateAccountText"></div>
+    <button class="buy-btn" style="width:100%" onclick="copyAccount()">계좌번호 복사</button>
+    <div style="margin-top:14px; font-size:12px; color:#777;">⚙ 후원 계좌 설정 (운영자용)</div>
+    <input type="text" id="accountInput" class="small-input" placeholder="예: 제주은행 123-456-789012 (제주가치줍깅)">
+    <button class="primary-btn" style="background:#4a7de0" onclick="saveAccount()">계좌 저장</button>
+  </div>
+</div>
+
+<!-- ===================== 게스트 안내 모달 ===================== -->
+<div class="modal-back" id="guestModal">
+  <div class="modal">
+    <h2> 환영합니다!</h2>
+    <p style="font-size:14px; line-height:1.8;">
+      제주 가치줍깅에는 <b>로그인 / 로그아웃 기능이 없습니다.</b><br>
+      지금 <b>게스트 계정</b>으로 이용 중이며,
+      포인트와 기록은 이 브라우저(기기)에만 저장됩니다.<br><br>
+      제주 바다를 함께 지켜요! 
+    </p>
+    <button class="primary-btn" onclick="closeGuestNotice()">확인했어요</button>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+"use strict";
+
+/* ============================================================
+   전역 에러 캐처: 어디서든 스크립트 에러가 나면 화면에 바로 표시
+   (원인 파악용 — 정상 동작 시에는 아무 영향 없음)
+   ============================================================ */
+window.addEventListener("error", function(e) {
+  const box = document.getElementById("fatalError");
+  box.classList.add("show");
+  box.textContent += "[에러] " + e.message + "\n  at " + (e.filename || "") + ":" + e.lineno + "\n\n";
+});
+window.addEventListener("unhandledrejection", function(e) {
+  const box = document.getElementById("fatalError");
+  box.classList.add("show");
+  box.textContent += "[Promise 에러] " + (e.reason && e.reason.message ? e.reason.message : e.reason) + "\n\n";
+});
+
+/* ============================================================
+   ⚙ 설정: Apps Script 웹 앱 URL을 여기에 붙여넣으세요.
+   비워두면(또는 통신 실패 시) 자동으로 데모 데이터로 동작합니다.
+   ============================================================ */
+const API_URL = "";
+
+/* ===== 데모 줍깅 구역 데이터 (구글 시트 열 구성과 동일) =====
+   지역 이름 | 위도 | 경도 | 등록 시간 | 줍깅 완료 여부 */
+const DEMO_ZONES = [
+  { name: "함덕해수욕장",   lat: 33.5434, lng: 126.6697, regTime: "2026-07-01 09:00", done: false },
+  { name: "이호테우해변",   lat: 33.4979, lng: 126.4528, regTime: "2026-07-01 09:10", done: false },
+  { name: "협재해수욕장",   lat: 33.3940, lng: 126.2396, regTime: "2026-07-02 10:00", done: true  },
+  { name: "곽지해수욕장",   lat: 33.4508, lng: 126.3057, regTime: "2026-07-02 11:30", done: false },
+  { name: "김녕해수욕장",   lat: 33.5578, lng: 126.7587, regTime: "2026-07-03 08:20", done: false },
+  { name: "표선해비치해변", lat: 33.3268, lng: 126.8419, regTime: "2026-07-03 14:00", done: false },
+  { name: "중문색달해변",   lat: 33.2447, lng: 126.4106, regTime: "2026-07-04 13:00", done: true  },
+  { name: "광치기해변",     lat: 33.4506, lng: 126.9282, regTime: "2026-07-05 07:40", done: false },
+  { name: "용두암 해안도로", lat: 33.5158, lng: 126.5119, regTime: "2026-07-05 16:00", done: false },
+  { name: "사계해변",       lat: 33.2223, lng: 126.2892, regTime: "2026-07-06 10:30", done: false }
+];
+
+/* ===== 상점 품목: 카테고리별, 포인트 가격 + 현실 가격 + 1인당 구매 제한 ===== */
+const SHOP_ITEMS = {
+  "편의점": [
+    { id: "cu5000",  name: "CU 모바일 상품권 5,000원",  point: 500,  real: 5000,  limit: 3 },
+    { id: "gs3000",  name: "GS25 모바일 상품권 3,000원", point: 300,  real: 3000,  limit: 5 },
+    { id: "icecream", name: "편의점 아이스크림 교환권",  point: 120,  real: 1500,  limit: 10 }
+  ],
+  "카페": [
+    { id: "americano", name: "아메리카노 (Tall)",  point: 350, real: 4500, limit: 5 },
+    { id: "latte",     name: "카페라떼 (Tall)",    point: 420, real: 5000, limit: 5 },
+    { id: "cake",      name: "조각 케이크",        point: 550, real: 6500, limit: 3 }
+  ],
+  "치킨": [
+    { id: "fried",   name: "후라이드 치킨 한 마리", point: 1500, real: 18000, limit: 2 },
+    { id: "yangnyeom", name: "양념 치킨 한 마리",  point: 1600, real: 19000, limit: 2 }
+  ],
+  "햄버거": [
+    { id: "bulgogiset", name: "불고기버거 세트", point: 700, real: 8500, limit: 3 },
+    { id: "cheeseburger", name: "치즈버거 단품", point: 450, real: 5500, limit: 5 }
+  ]
+};
+
+/* ===== 부적절한 파티명 금지어 목록 ===== */
+const BAD_WORDS = ["바보","멍청이","시발","씨발","병신","개새","미친놈","미친년","존나","꺼져","죽어","fuck","shit","섹스"];
+
+/* ===== 데모 파티 ===== */
+const DEMO_PARTIES = [
+  { id: 1, name: "함덕 아침 줍깅단", members: 8,  zone: "함덕해수욕장" },
+  { id: 2, name: "협재 바다지킴이", members: 12, zone: "협재해수욕장" },
+  { id: 3, name: "제주시 퇴근 줍깅", members: 5,  zone: "용두암 해안도로" },
+  { id: 4, name: "주말 광치기 클린업", members: 20, zone: "광치기해변" }
+];
+
+/* ===== 데모 랭킹 (초 단위 줍깅 시간) ===== */
+const DEMO_RANKINGS = {
+  "일간": [ ["해녀삼춘", 7200], ["돌하르방", 5400], ["한라산꾼", 4300], ["바다사랑", 3200], ["감귤청년", 1800] ],
+  "주간": [ ["해녀삼춘", 36000], ["바다사랑", 28800], ["돌하르방", 25200], ["한라산꾼", 18000], ["감귤청년", 12600] ],
+  "월간": [ ["바다사랑", 150000], ["해녀삼춘", 132000], ["올레길워커", 110400], ["돌하르방", 96000], ["한라산꾼", 72000] ],
+  "연간": [ ["해녀삼춘", 1500000], ["바다사랑", 1320000], ["돌하르방", 1150000], ["올레길워커", 980000], ["한라산꾼", 760000] ]
+};
+
+/* 주간/월간 순위권 보너스 포인트 */
+const WEEKLY_BONUS  = [300, 200, 100];
+const MONTHLY_BONUS = [1000, 700, 400];
+
+/* 줍깅 시간(분)에 따른 차등 포인트 지급 표 */
+function calcPoints(seconds) {
+  const min = seconds / 60;
+  if (min < 1)  return 5;    // 1분 미만: 참여 포인트
+  if (min < 10) return 30;   // 1~10분
+  if (min < 30) return 100;  // 10~30분
+  if (min < 60) return 250;  // 30~60분
+  return 250 + Math.floor((min - 60) / 30) * 100 + 150; // 1시간 이상
+}
+
+/* ============================================================
+   저장소(localStorage) 도우미
+   ============================================================ */
+const LS = {
+  get(key, def) {
+    try {
+      const v = localStorage.getItem("jeju_" + key);
+      return v === null ? def : JSON.parse(v);
+    } catch (e) { return def; }
+  },
+  set(key, val) { localStorage.setItem("jeju_" + key, JSON.stringify(val)); }
+};
+
+function todayStr()  { const d = new Date(); return d.getFullYear() + "-" + (d.getMonth()+1) + "-" + d.getDate(); }
+function weekId()    { const d = new Date(); const onejan = new Date(d.getFullYear(),0,1); const w = Math.ceil((((d - onejan) / 86400000) + onejan.getDay() + 1) / 7); return d.getFullYear() + "-W" + w; }
+function monthId()   { const d = new Date(); return d.getFullYear() + "-" + (d.getMonth()+1); }
+function yearId()    { return String(new Date().getFullYear()); }
+
+function fmtHMS(sec) {
+  sec = Math.max(0, Math.floor(sec));
+  const h = String(Math.floor(sec/3600)).padStart(2,"0");
+  const m = String(Math.floor(sec%3600/60)).padStart(2,"0");
+  const s = String(sec%60).padStart(2,"0");
+  return h + ":" + m + ":" + s;
+}
+function fmtClock(ts) {
+  const d = new Date(ts);
+  return String(d.getHours()).padStart(2,"0") + ":" + String(d.getMinutes()).padStart(2,"0") + ":" + String(d.getSeconds()).padStart(2,"0");
+}
+
+/* ============================================================
+   전역 상태
+   ============================================================ */
+let zones = [];
+let map, markers = [];
+let selectedZone = LS.get("selectedZone", null);
+let points = LS.get("points", 0);
+let running = LS.get("runningStart", null);   // 타이머 시작 시각(ms) 또는 null
+let pending = LS.get("pending", null);        // 인증 대기 세션 { end, dur }
+let currentCat = "편의점";
+let currentRankTab = "일간";
+
+/* 하루 총 줍깅 시간: 날짜가 바뀌면(자정) 자동 초기화 */
+function getDaily() {
+  let d = LS.get("daily", { date: todayStr(), sec: 0 });
+  if (d.date !== todayStr()) { d = { date: todayStr(), sec: 0 }; LS.set("daily", d); }
+  return d;
+}
+function addDaily(sec) {
+  const d = getDaily();
+  d.sec += sec;
+  LS.set("daily", d);
+}
+
+/* 주간/월간/연간 누적 (랭킹용) - 기간 ID가 바뀌면 초기화 */
+function getPeriod(kind, idFn) {
+  let p = LS.get("period_" + kind, { id: idFn(), sec: 0 });
+  if (p.id !== idFn()) { p = { id: idFn(), sec: 0 }; LS.set("period_" + kind, p); }
+  return p;
+}
+function addPeriods(sec) {
+  ["week","month","year"].forEach(function(kind) {
+    const idFn = kind === "week" ? weekId : kind === "month" ? monthId : yearId;
+    const p = getPeriod(kind, idFn);
+    p.sec += sec;
+    LS.set("period_" + kind, p);
+  });
+}
+
+/* ============================================================
+   화면 갱신
+   ============================================================ */
+function toast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.style.display = "block";
+  clearTimeout(t._tm);
+  t._tm = setTimeout(function(){ t.style.display = "none"; }, 2600);
+}
+function openModal(id)  { document.getElementById(id).classList.add("open"); }
+function closeModal(id) { document.getElementById(id).classList.remove("open"); }
+
+function renderPoints() { document.getElementById("pointText").textContent = points.toLocaleString(); }
+function renderDaily()  { document.getElementById("dailyTotalText").textContent = fmtHMS(getDaily().sec); }
+function renderZone()   { document.getElementById("zoneName").textContent = selectedZone || "지도를 눌러 선택"; }
+
+/* 1초마다: 타이머 표시 + 하루 총 시간 + 인증 남은 시간 */
+setInterval(function tick() {
+  if (running) {
+    document.getElementById("timerDisplay").textContent = fmtHMS((Date.now() - running) / 1000);
+  }
+  renderDaily();
+  if (pending && document.getElementById("verifyModal").classList.contains("open")) {
+    const remain = 3600 - (Date.now() - pending.end) / 1000;
+    document.getElementById("verifyRemain").textContent = remain > 0 ? fmtHMS(remain) : "만료됨";
+  }
+}, 1000);
+
+/* ============================================================
+   타이머 (줍깅 시작 / 종료)
+   ============================================================ */
+function toggleTimer() {
+  const btn = document.getElementById("timerBtn");
+  if (!running) {
+    if (pending) { toast("먼저 이전 활동의 인증을 완료하거나 만료를 기다려주세요."); openVerify(); return; }
+    running = Date.now();
+    LS.set("runningStart", running);
+    document.getElementById("startTimeText").textContent = fmtClock(running);
+    document.getElementById("endTimeText").textContent = "-";
+    btn.textContent = "■ 줍깅 종료";
+    btn.className = "timer-btn btn-stop";
+    toast("줍깅 시작! " + (selectedZone ? selectedZone + "에서 " : "") + "화이팅");
+  } else {
+    const end = Date.now();
+    const dur = Math.floor((end - running) / 1000);
+    document.getElementById("endTimeText").textContent = fmtClock(end);
+    running = null;
+    LS.set("runningStart", null);
+    btn.textContent = " 줍깅 시작";
+    btn.className = "timer-btn btn-start";
+    document.getElementById("timerDisplay").textContent = "00:00:00";
+    pending = { end: end, dur: dur };
+    LS.set("pending", pending);
+    openVerify();
+  }
+}
+
+/* ============================================================
+   인증 사진 (종료 후 1시간 이내)
+   ============================================================ */
+function openVerify() {
+  if (!pending) return;
+  if ((Date.now() - pending.end) / 1000 > 3600) {
+    pending = null; LS.set("pending", null);
+    toast(" 인증 시간(1시간)이 지나 포인트가 지급되지 않았습니다.");
+    return;
+  }
+  document.getElementById("verifyDuration").textContent = fmtHMS(pending.dur);
+  document.getElementById("photoInput").value = "";
+  document.getElementById("photoPreview").style.display = "none";
+  document.getElementById("verifyBtn").disabled = true;
+  openModal("verifyModal");
+}
+function previewPhoto() {
+  const file = document.getElementById("photoInput").files[0];
+  if (!file) return;
+  const img = document.getElementById("photoPreview");
+  img.src = URL.createObjectURL(file);
+  img.style.display = "block";
+  document.getElementById("verifyBtn").disabled = false;
+}
+function submitVerification() {
+  if (!pending) return;
+  if ((Date.now() - pending.end) / 1000 > 3600) {
+    pending = null; LS.set("pending", null);
+    closeModal("verifyModal");
+    toast(" 인증 시간(1시간)이 지나 포인트가 지급되지 않았습니다.");
+    return;
+  }
+  const earned = calcPoints(pending.dur);
+  points += earned;
+  LS.set("points", points);
+  addDaily(pending.dur);
+  addPeriods(pending.dur);
+
+  /* 선택한 구역이 있으면 '줍깅 완료'로 표시 (+API 전송 시도) */
+  if (selectedZone) {
+    const z = zones.find(function(z){ return z.name === selectedZone; });
+    if (z && !z.done) {
+      z.done = true;
+      postToApi({ action: "complete", name: z.name });
+      drawMarkers();
+    }
+  }
+  const dur = pending.dur;
+  pending = null;
+  LS.set("pending", null);
+  closeModal("verifyModal");
+  toast(" 인증 완료! 줍깅 " + fmtHMS(dur) + " → +" + earned + "P 지급!");
+  renderPoints();
+}
+function cancelVerification() {
+  closeModal("verifyModal");
+  toast("종료 후 1시간 안에 상단 '인증 대기' 버튼으로 인증해주세요!");
+  showPendingButton();
+}
+function showPendingButton() {
+  if (document.getElementById("pendingBtn")) return;
+  const btn = document.createElement("button");
+  btn.id = "pendingBtn";
+  btn.className = "icon-btn";
+  btn.textContent = "인증 대기";
+  btn.style.background = "#ff8c42";
+  btn.onclick = openVerify;
+  document.querySelector(".header-icons").prepend(btn);
+  const iv = setInterval(function() {
+    if (!pending) { btn.remove(); clearInterval(iv); }
+  }, 1000);
+}
+
+/* ============================================================
+   지도 (Leaflet + OpenStreetMap)
+   ============================================================ */
+function initMap() {
+  if (typeof L === "undefined") {
+    throw new Error("Leaflet 라이브러리(L)를 불러오지 못했습니다. unpkg.com CDN 접속이 막혀있는지 확인해주세요.");
+  }
+  map = L.map("map").setView([33.38, 126.55], 10);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 18,
+    subdomains: "abc",
+    attribution: "&copy; OpenStreetMap contributors"
+  }).addTo(map);
+}
+function drawMarkers() {
+  markers.forEach(function(m){ map.removeLayer(m); });
+  markers = [];
+  zones.forEach(function(z) {
+    const icon = L.divIcon({
+      className: "",
+      html: '<div style="font-size:26px; text-shadow:0 1px 3px rgba(0,0,0,.4);">' + (z.done ? "✅" : "🗑️") + "</div>",
+      iconSize: [26, 26], iconAnchor: [13, 13]
+    });
+    const m = L.marker([z.lat, z.lng], { icon: icon }).addTo(map);
+    m.bindPopup(
+      "<b>" + z.name + "</b><br>등록: " + z.regTime +
+      "<br>상태: " + (z.done ? "줍깅 완료" : "줍깅 필요") +
+      '<br><button style="margin-top:6px; padding:5px 10px; border:none; background:#2eb086; color:#fff; border-radius:6px; cursor:pointer;" onclick="selectZone(\'' + z.name.replace(/'/g, "\\'") + '\')">이 구역 선택</button>'
+    );
+    markers.push(m);
+  });
+}
+function selectZone(name) {
+  selectedZone = name;
+  LS.set("selectedZone", name);
+  renderZone();
+  map.closePopup();
+  toast( name + " 선택됨");
+}
+
+/* ============================================================
+   백엔드 통신 (Apps Script). 실패 시 데모 데이터 사용
+   ============================================================ */
+async function loadZones() {
+  if (API_URL) {
+    try {
+      const res = await fetch(API_URL);
+      const data = await res.json();
+      /* 시트 열: 지역 이름 | 위도 | 경도 | 등록 시간 | 줍깅 완료 여부 */
+      zones = data.rows.map(function(r) {
+        return {
+          name: r["지역 이름"],
+          lat: parseFloat(r["위도"]),
+          lng: parseFloat(r["경도"]),
+          regTime: r["등록 시간"],
+          done: String(r["줍깅 완료 여부"]) === "true" || r["줍깅 완료 여부"] === "완료" || r["줍깅 완료 여부"] === true
+        };
+      }).filter(function(z){ return z.name && !isNaN(z.lat) && !isNaN(z.lng); });
+      toast("구글 시트에서 " + zones.length + "개 구역을 불러왔습니다.");
+    } catch (e) {
+      zones = JSON.parse(JSON.stringify(DEMO_ZONES));
+      toast("서버 연결 실패 — 데모 데이터로 실행합니다.");
+    }
+  } else {
+    zones = JSON.parse(JSON.stringify(DEMO_ZONES));
+  }
+  drawMarkers();
+}
+function postToApi(payload) {
+  if (!API_URL) return;
+  /* Content-Type을 text/plain으로 보내면 CORS 사전요청(preflight)이 생기지 않습니다 */
+  fetch(API_URL, { method: "POST", headers: { "Content-Type": "text/plain" }, body: JSON.stringify(payload) })
+    .catch(function(){ /* 실패해도 앱은 계속 동작 */ });
+}
+
+/* ============================================================
+   포인트 상점
+   ============================================================ */
+function openShop() {
+  renderCatTabs();
+  renderShop();
+  openModal("shopModal");
+}
+function renderCatTabs() {
+  const box = document.getElementById("catTabs");
+  box.innerHTML = "";
+  Object.keys(SHOP_ITEMS).forEach(function(cat) {
+    const b = document.createElement("button");
+    b.className = "cat-tab" + (cat === currentCat ? " active" : "");
+    b.textContent = cat;
+    b.onclick = function() { currentCat = cat; renderCatTabs(); renderShop(); };
+    box.appendChild(b);
+  });
+}
+function renderShop() {
+  const list = document.getElementById("shopList");
+  const bought = LS.get("purchases", {});
+  list.innerHTML = "";
+  SHOP_ITEMS[currentCat].forEach(function(item) {
+    const count = bought[item.id] || 0;
+    const soldOut = count >= item.limit;
+    const div = document.createElement("div");
+    div.className = "shop-item";
+    div.innerHTML =
+      '<div><div class="name">' + item.name + '</div>' +
+      '<div class="price">' + item.point.toLocaleString() + 'P' +
+      '<span class="real-price">(정가 ' + item.real.toLocaleString() + '원)</span></div>' +
+      '<div class="limit">구매 제한: ' + count + ' / ' + item.limit + '개</div></div>';
+    const btn = document.createElement("button");
+    btn.className = "buy-btn";
+    btn.textContent = soldOut ? "구매 한도 도달" : "구매";
+    btn.disabled = soldOut || points < item.point;
+    if (!soldOut && points < item.point) btn.textContent = "포인트 부족";
+    btn.onclick = function() { buyItem(item); };
+    div.appendChild(btn);
+    list.appendChild(div);
+  });
+}
+function buyItem(item) {
+  const bought = LS.get("purchases", {});
+  const count = bought[item.id] || 0;
+  if (count >= item.limit) { toast("이 품목은 1인당 " + item.limit + "개까지만 구매할 수 있어요."); return; }
+  if (points < item.point) { toast("포인트가 부족합니다."); return; }
+  points -= item.point;
+  bought[item.id] = count + 1;
+  LS.set("points", points);
+  LS.set("purchases", bought);
+  renderPoints();
+  renderShop();
+  toast(" 「" + item.name + "」 구매 완료! (-" + item.point + "P)");
+}
+
+/* ============================================================
+   랭킹 (일간/주간/월간/연간) + 주간·월간 보너스
+   ============================================================ */
+function myPeriodSec(tab) {
+  if (tab === "일간") return getDaily().sec;
+  if (tab === "주간") return getPeriod("week", weekId).sec;
+  if (tab === "월간") return getPeriod("month", monthId).sec;
+  return getPeriod("year", yearId).sec;
+}
+function buildRanking(tab) {
+  const rows = DEMO_RANKINGS[tab].map(function(r){ return { name: r[0], sec: r[1], me: false }; });
+  rows.push({ name: "나 (게스트)", sec: myPeriodSec(tab), me: true });
+  rows.sort(function(a, b){ return b.sec - a.sec; });
+  return rows;
+}
+function openRanking() {
+  renderRankTabs();
+  renderRanking();
+  checkRankBonus();
+  openModal("rankModal");
+}
+function renderRankTabs() {
+  const box = document.getElementById("rankTabs");
+  box.innerHTML = "";
+  ["일간","주간","월간","연간"].forEach(function(tab) {
+    const b = document.createElement("button");
+    b.className = "cat-tab" + (tab === currentRankTab ? " active" : "");
+    b.textContent = tab;
+    b.onclick = function() { currentRankTab = tab; renderRankTabs(); renderRanking(); };
+    box.appendChild(b);
+  });
+}
+function renderRanking() {
+  const list = document.getElementById("rankList");
+  const rows = buildRanking(currentRankTab);
+  const medals = ["1","2","3"];
+  list.innerHTML = "";
+  rows.forEach(function(r, i) {
+    const div = document.createElement("div");
+    div.className = "rank-row" + (r.me ? " me" : "");
+    div.innerHTML =
+      '<span><span class="rank-medal">' + (medals[i] || (i+1) + "위") + '</span> ' + r.name + '</span>' +
+      '<span>' + fmtHMS(r.sec) + '</span>';
+    list.appendChild(div);
+  });
+}
+/* 주간/월간 순위권(1~3위) 보너스: 기간마다 1번만 지급 */
+function checkRankBonus() {
+  [["주간", WEEKLY_BONUS, "bonus_week_", weekId()], ["월간", MONTHLY_BONUS, "bonus_month_", monthId()]].forEach(function(cfg) {
+    const tab = cfg[0], table = cfg[1], key = cfg[2] + cfg[3];
+    if (LS.get(key, false)) return;
+    const rows = buildRanking(tab);
+    const myRank = rows.findIndex(function(r){ return r.me; });
+    if (myRank >= 0 && myRank < 3 && rows[myRank].sec > 0) {
+      const bonus = table[myRank];
+      points += bonus;
+      LS.set("points", points);
+      LS.set(key, true);
+      renderPoints();
+      toast( tab + " 랭킹 " + (myRank+1) + "위 보너스 +" + bonus + "P 지급!");
+    }
+  });
+}
+
+/* ============================================================
+   파티 (목록 / 참가 / 생성 + 금지어 필터)
+   ============================================================ */
+function getParties() {
+  let p = LS.get("parties", null);
+  if (!p) { p = JSON.parse(JSON.stringify(DEMO_PARTIES)); LS.set("parties", p); }
+  return p;
+}
+function renderParties() {
+  const parties = getParties();
+  const joined = LS.get("joinedParties", []);
+  const myBox = document.getElementById("myPartyList");
+  const openBox = document.getElementById("openPartyList");
+  myBox.innerHTML = ""; openBox.innerHTML = "";
+
+  parties.forEach(function(p) {
+    const isMine = joined.indexOf(p.id) !== -1;
+    const div = document.createElement("div");
+    div.className = "party-card";
+    div.innerHTML = '<div><div class="p-name">' + p.name + '</div>' +
+      '<div class="p-info"> ' + p.members + '명 · ' + p.zone + '</div></div>';
+    const btn = document.createElement("button");
+    btn.className = "buy-btn";
+    if (isMine) {
+      btn.textContent = "탈퇴";
+      btn.style.background = "#ff6b6b";
+      btn.onclick = function() { leaveParty(p.id); };
+      div.appendChild(btn);
+      myBox.appendChild(div);
+    } else {
+      btn.textContent = "참가";
+      btn.onclick = function() { joinParty(p.id); };
+      div.appendChild(btn);
+      openBox.appendChild(div);
+    }
+  });
+  if (!myBox.children.length)  myBox.innerHTML  = '<div style="font-size:12px;color:#999;padding:6px;">아직 참가한 파티가 없어요.</div>';
+  if (!openBox.children.length) openBox.innerHTML = '<div style="font-size:12px;color:#999;padding:6px;">참가할 수 있는 파티가 없어요.</div>';
+}
+function joinParty(id) {
+  const joined = LS.get("joinedParties", []);
+  if (joined.indexOf(id) === -1) joined.push(id);
+  LS.set("joinedParties", joined);
+  const parties = getParties();
+  const p = parties.find(function(x){ return x.id === id; });
+  if (p) { p.members++; LS.set("parties", parties); }
+  renderParties();
+  toast("파티에 참가했어요!");
+}
+function leaveParty(id) {
+  let joined = LS.get("joinedParties", []);
+  joined = joined.filter(function(x){ return x !== id; });
+  LS.set("joinedParties", joined);
+  const parties = getParties();
+  const p = parties.find(function(x){ return x.id === id; });
+  if (p && p.members > 0) { p.members--; LS.set("parties", parties); }
+  renderParties();
+  toast("파티에서 탈퇴했어요.");
+}
+function isBadName(name) {
+  const lower = name.toLowerCase().replace(/\s/g, "");
+  return BAD_WORDS.some(function(w){ return lower.indexOf(w) !== -1; });
+}
+function createParty() {
+  const input = document.getElementById("newPartyName");
+  const name = input.value.trim();
+  if (name.length < 2) { toast("파티 이름은 2글자 이상 입력해주세요."); return; }
+  if (isBadName(name)) { toast("부적절한 단어가 포함된 파티명은 사용할 수 없어요."); return; }
+  const parties = getParties();
+  if (parties.some(function(p){ return p.name === name; })) { toast("이미 같은 이름의 파티가 있어요."); return; }
+  const newParty = { id: Date.now(), name: name, members: 1, zone: selectedZone || "미정" };
+  parties.push(newParty);
+  LS.set("parties", parties);
+  const joined = LS.get("joinedParties", []);
+  joined.push(newParty.id);
+  LS.set("joinedParties", joined);
+  input.value = "";
+  renderParties();
+  toast("파티 「" + name + "」 생성 완료! 자동으로 참가되었어요.");
+}
+
+/* ============================================================
+   후원 (계좌 설정 가능)
+   ============================================================ */
+function getAccount() { return LS.get("donateAccount", "제주은행 123-456-789012 (제주가치줍깅)"); }
+function openDonate() {
+  document.getElementById("donateAccountText").textContent = "💳 " + getAccount();
+  document.getElementById("accountInput").value = getAccount();
+  openModal("donateModal");
+}
+function saveAccount() {
+  const v = document.getElementById("accountInput").value.trim();
+  if (!v) { toast("계좌 정보를 입력해주세요."); return; }
+  LS.set("donateAccount", v);
+  document.getElementById("donateAccountText").textContent =v;
+  toast("후원 계좌가 저장되었습니다.");
+}
+function copyAccount() {
+  const text = getAccount();
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(function(){ toast("계좌번호가 복사되었습니다!"); });
+  } else {
+    toast(text);
+  }
+}
+
+/* ============================================================
+   게스트 안내 (첫 방문 시 1회)
+   ============================================================ */
+function closeGuestNotice() {
+  LS.set("guestNoticeSeen", true);
+  closeModal("guestModal");
+}
+
+/* ============================================================
+   시작
+   ============================================================ */
+window.addEventListener("load", function() {
+  /* 각 초기화 단계를 개별 try/catch로 분리:
+     한 단계(예: 지도)가 실패해도 나머지(포인트/타이머 등)는 정상 동작하도록 함 */
+  function safe(label, fn) {
+    try { fn(); } catch (e) {
+      console.error("[" + label + "] 초기화 실패:", e);
+      const box = document.getElementById("fatalError");
+      box.classList.add("show");
+      box.textContent += "[" + label + "] " + e.message + "\n\n";
+    }
+  }
+
+  safe("지도 초기화", initMap);
+  safe("구역 데이터 로드", loadZones);
+  safe("포인트 표시", renderPoints);
+  safe("오늘 줍깅 시간 표시", renderDaily);
+  safe("선택 구역 표시", renderZone);
+
+  safe("타이머 복원", function() {
+    /* 새로고침 후에도 진행 중이던 타이머 복원 */
+    if (running) {
+      document.getElementById("startTimeText").textContent = fmtClock(running);
+      const btn = document.getElementById("timerBtn");
+      btn.textContent = "■ 줍깅 종료";
+      btn.className = "timer-btn btn-stop";
+    }
+  });
+
+  safe("인증 대기 세션 처리", function() {
+    /* 인증 대기 중이던 세션 처리 */
+    if (pending) {
+      if ((Date.now() - pending.end) / 1000 > 3600) {
+        pending = null; LS.set("pending", null);
+        toast("이전 활동의 인증 시간이 지나 포인트가 지급되지 않았습니다.");
+      } else {
+        showPendingButton();
+        openVerify();
+      }
+    }
+  });
+
+  safe("게스트 안내 표시", function() {
+    /* 첫 방문 게스트 안내 */
+    if (!LS.get("guestNoticeSeen", false)) openModal("guestModal");
+  });
+});
+</script>
+</body>
+</html>
